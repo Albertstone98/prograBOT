@@ -552,18 +552,12 @@ const quickmenu = document.getElementById('quickmenu');
     FORMATEADOR DE MARKDOWN LIMPIO (Negritas e Itálicas)
    ===================================================== */
 function formatearRespuesta(texto){
-  // 1. Limpiamos y convertimos enlaces
   let res = texto.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 
-  // 2. Convertimos **texto** o __texto__ en <strong>
   res = res.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   res = res.replace(/__(.*?)__/g, '<strong>$1</strong>');
-
-  // 3. Convertimos *texto* o _texto_ en <em>
   res = res.replace(/\*(.*?)\*/g, '<em>$1</em>');
   res = res.replace(/_(.*?)_/g, '<em>$1</em>');
-
-  // 4. Convertimos `código` en <code>
   res = res.replace(/`(.*?)`/g, '<code>$1</code>');
 
   return res
@@ -616,7 +610,6 @@ function reproducirVoz(textoPlano, boton){
 
   detenerLectura();
 
-  // Limpiamos etiquetas HTML temporales para que la voz lea fluido
   const temporal = document.createElement('div');
   temporal.innerHTML = formatearRespuesta(textoPlano);
   const textoLimpio = temporal.textContent || temporal.innerText || "";
@@ -756,7 +749,6 @@ async function inicializarBase(){
    MOTOR DE CONSULTAS Y COMANDO COMANDOS (/ O SIN /)
    ===================================================== */
 function consultarBase(consulta){
-  // Limpiamos la consulta y permitimos /comandos o comandos (con o sin barra)
   let textoLimpio = consulta.trim().toLowerCase();
   if (textoLimpio.startsWith('/')) {
     textoLimpio = textoLimpio.substring(1);
@@ -767,24 +759,28 @@ function consultarBase(consulta){
     BASE_CONOCIMIENTO.forEach(item => {
       const descripcion = item.preguntas_ejemplo ? item.preguntas_ejemplo[0] : item.tema;
       
-      // Tomamos la primera palabra clave y le quitamos la barra inicial si la tuviera en el JSON
       let unaKeyword = item.keywords && item.keywords.length > 0 ? item.keywords[0].split(' ')[0] : item.id;
       if (unaKeyword.startsWith('/')) unaKeyword = unaKeyword.substring(1);
       
-      listado += `• **\`${unaKeyword}\`** (o con barra ` + '`/`' + `) ➔ *${descripcion}*\n`;
+      // Mostramos la palabra clave precedida por la barra sin espacios
+      listado += `• **\`/${unaKeyword}\`** ➔ *${descripcion}*\n`;
     });
-    listado += "\n💡 *Escribí cualquiera de estas palabras clave en el chat (podés usar la barra opcionalmente, ej: `tpi` o `/tpi`) para consultar su respuesta.*";
+    listado += "\n💡 *Escribí cualquiera de estas palabras clave en el chat (con o sin barra, ej: `tpi` o `/tpi`) para consultar su respuesta.*";
     return listado;
   }
 
   if (!MOTOR_BUSQUEDA) return null;
 
-  // Permitimos buscar palabras clave que en el JSON tengan o no la barra
-  let queryLimpia = consulta
+  // Limpiamos la consulta del usuario por si incluye barra al inicio para que Fuse.js busque la palabra clave limpia
+  let queryLimpia = consulta.trim().toLowerCase();
+  if (queryLimpia.startsWith('/')) {
+    queryLimpia = queryLimpia.substring(1);
+  }
+
+  queryLimpia = queryLimpia
     .replace(/[¿?¡!.,;:()]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+    .trim();
 
   const resultados = MOTOR_BUSQUEDA.search(queryLimpia);
 

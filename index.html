@@ -498,7 +498,7 @@ footer.note {
 <header class="hero">
   <p class="eyebrow"># cátedra_programación_1 / asistente virtual</p>
   <h1>Maxi<span class="amp">BOT</span></h1>
-  <p>Preguntame sobre pautas, fechas, TPI o cursada. Escribí <b>/comandos</b> para ver la ayuda.</p>
+  <p>Preguntame sobre pautas, fechas, TPI o cursada. Escribí <b>comandos</b> o <b>/comandos</b>.</p>
 </header>
 
 <main>
@@ -508,7 +508,7 @@ footer.note {
     <div class="chatlog" id="chatlog" role="log" aria-live="polite" tabindex="0"></div>
     <div class="inputbar">
       <label for="userInput" style="position:absolute; left:-9999px;">Escribí tu consulta</label>
-      <textarea id="userInput" rows="1" placeholder="Ingresá palabras clave o escribí /comandos..."></textarea>
+      <textarea id="userInput" rows="1" placeholder="Ingresá palabras clave o escribí comandos..."></textarea>
       <button class="sendbtn" id="sendBtn" type="button">Enviar</button>
     </div>
   </div>
@@ -548,9 +548,25 @@ const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
 const quickmenu = document.getElementById('quickmenu');
 
+/* =====================================================
+    FORMATEADOR DE MARKDOWN LIMPIO (Negritas e Itálicas)
+   ===================================================== */
 function formatearRespuesta(texto){
-  const textoConLinks = texto.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-  return textoConLinks
+  // 1. Limpiamos y convertimos enlaces
+  let res = texto.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  // 2. Convertimos **texto** o __texto__ en <strong>
+  res = res.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  res = res.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+  // 3. Convertimos *texto* o _texto_ en <em>
+  res = res.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  res = res.replace(/_(.*?)_/g, '<em>$1</em>');
+
+  // 4. Convertimos `código` en <code>
+  res = res.replace(/`(.*?)`/g, '<code>$1</code>');
+
+  return res
     .split(/\n{2,}/)
     .map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`)
     .join('');
@@ -600,9 +616,13 @@ function reproducirVoz(textoPlano, boton){
 
   detenerLectura();
 
-  const textoLimpio = textoPlano.replace(/https?:\/\/[^\s]+/g, 'el enlace de zoom');
+  // Limpiamos etiquetas HTML temporales para que la voz lea fluido
+  const temporal = document.createElement('div');
+  temporal.innerHTML = formatearRespuesta(textoPlano);
+  const textoLimpio = temporal.textContent || temporal.innerText || "";
+  const textoFinal = textoLimpio.replace(/https?:\/\/[^\s]+/g, 'el enlace de zoom');
 
-  const utterance = new SpeechSynthesisUtterance(textoLimpio);
+  const utterance = new SpeechSynthesisUtterance(textoFinal);
   utterance.lang = 'es-AR';
   utterance.rate = 1.0;
   if (vozSeleccionada) utterance.voice = vozSeleccionada;
@@ -723,7 +743,7 @@ async function inicializarBase(){
     CARGA_COMPLETA = true;
 
     actualizarEstado('Base lista', 'ready');
-    agregarMensaje('bot', '¡Hola! Soy MaxiBOT, el asistente virtual de Programación 1 🧑‍💻 Preguntame sobre pautas o escribí **/comandos** para ver la ayuda.');
+    agregarMensaje('bot', '¡Hola! Soy MaxiBOT, el asistente virtual de Programación 1 🧑‍💻 Preguntame sobre pautas o escribí **comandos** (o **/comandos**) para ver la ayuda.');
 
   } catch (error){
     console.error("MaxiBOT - Error cargando JSON:", error);
@@ -733,31 +753,38 @@ async function inicializarBase(){
 }
 
 /* =====================================================
-   MOTOR DE CONSULTAS Y COMANDO /comandos
+   MOTOR DE CONSULTAS Y COMANDO COMANDOS (/ O SIN /)
    ===================================================== */
 function consultarBase(consulta){
-  const textoLimpio = consulta.trim().toLowerCase();
+  // Limpiamos la consulta y permitimos /comandos o comandos (con o sin barra)
+  let textoLimpio = consulta.trim().toLowerCase();
+  if (textoLimpio.startsWith('/')) {
+    textoLimpio = textoLimpio.substring(1);
+  }
 
-  // Si el usuario escribe /comandos, generamos el listado con una sola palabra clave por ítem
-  if (textoLimpio === '/comandos') {
-    let listado = "📋 **Listado de Comandos y Palabras Clave Disponibles:**\n\n";
+  if (textoLimpio === 'comandos') {
+    let listado = "📋 **Listado de Palabras Clave Disponibles:**\n\n";
     BASE_CONOCIMIENTO.forEach(item => {
       const descripcion = item.preguntas_ejemplo ? item.preguntas_ejemplo[0] : item.tema;
-      // Seleccionamos estrictamente una sola palabra clave (la primera del array)
-      const unaKeyword = item.keywords && item.keywords.length > 0 ? item.keywords[0].split(' ')[0] : item.id;
       
-      listado += `• **\`${unaKeyword}\`** ➔ *${descripcion}*\n`;
+      // Tomamos la primera palabra clave y le quitamos la barra inicial si la tuviera en el JSON
+      let unaKeyword = item.keywords && item.keywords.length > 0 ? item.keywords[0].split(' ')[0] : item.id;
+      if (unaKeyword.startsWith('/')) unaKeyword = unaKeyword.substring(1);
+      
+      listado += `• **\`${unaKeyword}\`** (o con barra ` + '`/`' + `) ➔ *${descripcion}*\n`;
     });
-    listado += "\n💡 *Escribí cualquiera de estas palabras clave en el chat para consultar su respuesta.*";
+    listado += "\n💡 *Escribí cualquiera de estas palabras clave en el chat (podés usar la barra opcionalmente, ej: `tpi` o `/tpi`) para consultar su respuesta.*";
     return listado;
   }
 
   if (!MOTOR_BUSQUEDA) return null;
 
-  const queryLimpia = consulta
+  // Permitimos buscar palabras clave que en el JSON tengan o no la barra
+  let queryLimpia = consulta
     .replace(/[¿?¡!.,;:()]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .toLowerCase();
 
   const resultados = MOTOR_BUSQUEDA.search(queryLimpia);
 
@@ -789,7 +816,7 @@ function manejarConsulta(textoVisible){
     if (respuesta){
       agregarMensaje('bot', respuesta);
     } else {
-      agregarMensaje('bot', 'No encontré información exacta sobre esa consulta. Escribí **/comandos** para ver el listado de palabras clave disponibles o consultá en el foro del campus.');
+      agregarMensaje('bot', 'No encontré información exacta sobre esa consulta. Escribí **comandos** (o **/comandos**) para ver el listado de palabras clave disponibles.');
     }
   }, 350 + Math.random() * 200);
 }
